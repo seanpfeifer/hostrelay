@@ -47,6 +47,7 @@ type Server struct {
 func (srv *Server) trackConn(c *playerConn, add bool) {
 	srv.connMutex.Lock()
 	defer srv.connMutex.Unlock()
+
 	if add {
 		srv.activeConn[c] = struct{}{}
 	} else {
@@ -166,6 +167,7 @@ func (c *playerConn) Read(p []byte) (int, error) {
 }
 
 func (c *playerConn) Close() {
+	c.srv.trackConn(c, false)
 	c.conn.Close()
 }
 
