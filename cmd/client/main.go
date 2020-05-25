@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -12,20 +13,37 @@ import (
 )
 
 const (
-	host = ":8080"
+	hostTCP = ":8080"
+	hostUDP = ":8585"
 )
 
+type listener func(conn net.Conn, done chan struct{})
+
 func main() {
+	udpFlag := flag.Bool("udp", false, "use to enable UDP comms instead of the default TCP")
+	flag.Parse()
+	isUDP := *udpFlag
+
+	network, host := "tcp", hostTCP
+	if isUDP {
+		network, host = "udp", hostUDP
+	}
+
 	done := make(chan struct{})
 	out := make(chan string)
 
-	conn, err := net.Dial("tcp", host)
+	conn, err := net.Dial(network, host)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
 
-	go listenForMessages(conn, done)
+	list := listenForMessagesTCP
+	if isUDP {
+		list = listenForMessagesUDP
+	}
+
+	go list(conn, done)
 	go readUserInput(out)
 
 	for {
@@ -36,16 +54,21 @@ func main() {
 			if !ok {
 				return
 			}
-			send(conn, msg)
+			send(conn, msg, isUDP)
 		}
 	}
 
 }
 
-func send(conn net.Conn, msg string) {
+func send(conn net.Conn, msg string, isUDP bool) {
 	fmt.Printf("Sending \"%s\"\n> ", msg)
 
-	_, err := conn.Write(encodeMsg(msg))
+	encoder := encodeMsgTCP
+	if isUDP {
+		encoder = encodeMsgUDP
+	}
+
+	_, err := conn.Write(encoder(msg))
 	if err != nil {
 		log.Println(err)
 	}
@@ -67,17 +90,17 @@ func readUserInput(out chan<- string) {
 	}
 }
 
-func listenForMessages(conn net.Conn, done chan struct{}) {
+func listenForMessagesTCP(conn net.Conn, done chan struct{}) {
 	defer close(done)
 
-	scan.ListenAndDispatch(conn, onMessageReceived)
+	scan.ListenAndDispatch(conn, onMessageReceivedTCP)
 }
 
-func onMessageReceived(prefix [scan.PrefixLengthBytes]byte, data []byte) {
+func onMessageReceivedTCP(prefix [scan.PrefixLengthBytes]byte, data []byte) {
 	fmt.Println(string(data))
 }
 
-func encodeMsg(s string) []byte {
+func encodeMsgTCP(s string) []byte {
 	b := []byte(s)
 	size := uint32(len(b))
 
@@ -90,4 +113,25 @@ func encodeMsg(s string) []byte {
 	// Data
 	out = append(out, b...)
 	return out
+}
+
+func listenForMessagesUDP(conn net.Conn, done chan struct{}) {
+	defer close(done)
+
+	buf := make([]byte, 2048)
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			return
+		}
+		onMessageReceivedUDP(buf[:n])
+	}
+}
+
+func onMessageReceivedUDP(data []byte) {
+	fmt.Println(string(data))
+}
+
+func encodeMsgUDP(s string) []byte {
+	return []byte(s)
 }
