@@ -18,7 +18,7 @@ func ListenAndServeTCP(network, address string) error {
 		return err
 	}
 
-	log.Printf(`Listening on "%s"`, ln.Addr().String())
+	log.Printf(`Listening for %s on "%s"`, ln.Addr().Network(), ln.Addr().String())
 
 	srv := Server{
 		doneChan:   make(chan struct{}),
