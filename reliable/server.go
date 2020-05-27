@@ -66,6 +66,8 @@ func (srv *Server) Serve(l net.Listener) error {
 
 	var tempDelay time.Duration // how long to sleep on accept failure
 
+	// Most of this is the same as http.Server.Serve(), with the delay being copied with modifications,
+	// and the rest of the Server patterns being similar.
 	for {
 		conn, err := l.Accept()
 		// Handle any errors we get, delaying if there's a temporary error
