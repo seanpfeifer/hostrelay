@@ -7,6 +7,8 @@ The point of this is to be a dedicated relay server for multiplayer applications
 
 This exists to allow players to join games that don't need dedicated server logic.
 
+**DISCLAIMER: This is a hacked together prototype and should not be used in production! Code will change without warning and nothing is guaranteed!**
+
 ## What this **doesn't have**
 
 * Anti-cheat
