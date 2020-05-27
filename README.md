@@ -22,3 +22,23 @@ This exists to allow players to join games that don't need dedicated server logi
   * Each connection is stored
 * UDP socket to listen for messages from each player
   * Broadcast each received message to the rest of the connected players
+
+## Building & running
+
+```sh
+go run .\cmd\server
+```
+
+To run a test client in TCP mode:
+
+```sh
+go run .\cmd\client
+# Input strings and press enter to send. Type `exit` to quit.
+```
+
+For UDP:
+
+```sh
+go run .\cmd\client -udp
+# Input strings and press enter to send. Type `exit` to quit.
+```
