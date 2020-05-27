@@ -12,6 +12,9 @@ import (
 //
 // Just the IP probably isn't good enough to tie TCP + UDP connections - may need a special "join" message
 // to do that. But this may be good enough for the simple case of playing with my friends.
+//
+// Maybe send a unique n-byte code on TCP connect which will uniquely identify the TCP, and check for it as
+// the first message from a UDP client. If no valid code, ignore the client.
 type ClientInformant interface {
 	IsRegisteredClient(*net.UDPAddr) bool
 }
