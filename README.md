@@ -1,4 +1,4 @@
-# Host Relay
+# Host Relay Prototype
 
 The point of this is to be a dedicated relay server for multiplayer applications with two needs:
 
