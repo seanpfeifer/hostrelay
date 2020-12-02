@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using UnityEngine;
 
@@ -16,11 +13,17 @@ public class UDPClient
   private UdpClient udpClient;
   private Thread listenThread;
 
-  public UDPClient(string host, int port)
+  // Our message handler, which almost certainly should push messages onto a thread-safe queue
+  // so it can be handled on the main game thread.
+  public delegate void MessageHandler(byte[] bytes);
+  private MessageHandler handler;
+
+  public UDPClient(string host, int port, MessageHandler handler)
   {
     this.host = host;
     this.port = port;
     this.udpServerEndpoint = new IPEndPoint(IPAddress.Any, port);
+    this.handler = handler;
   }
 
   public void ConnectAndListen()
@@ -30,8 +33,6 @@ public class UDPClient
     listenThread = new Thread(new ThreadStart(ListenLoop));
     listenThread.IsBackground = true;
     listenThread.Start();
-
-    SendMessage("UDP client here!");
   }
 
   private void ListenLoop()
@@ -41,7 +42,7 @@ public class UDPClient
       while (true)
       {
         byte[] bytes = udpClient.Receive(ref udpServerEndpoint);
-        Debug.Log("Received UDP: " + Encoding.UTF8.GetString(bytes));
+        handler(bytes);
       }
     }
     catch (SocketException se)
@@ -50,20 +51,20 @@ public class UDPClient
     }
   }
 
-  public void SendMessage(string msg)
+  public void Send(byte[] rawMsg)
   {
-    if (udpClient == null)
-    {
-      return;
-    }
-
-    byte[] msgBytes = Encoding.UTF8.GetBytes(msg);
-    udpClient.Send(msgBytes, msgBytes.Length);
+    udpClient.Send(rawMsg, rawMsg.Length);
   }
 
   public void Close()
   {
-    listenThread.Interrupt();
-    udpClient.Close();
+    if (listenThread != null)
+    {
+      listenThread.Abort();
+    }
+    if (udpClient != null)
+    {
+      udpClient.Close();
+    }
   }
 }

@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using UnityEngine;
 
@@ -11,13 +8,20 @@ public class TCPClient
 {
   public readonly string host;
   public readonly int port;
+
   private TcpClient tcpClient;
   private Thread listenThread;
 
-  public TCPClient(string host, int port)
+  // Our message handler, which almost certainly should push messages onto a thread-safe queue
+  // so it can be handled on the main game thread.
+  public delegate void MessageHandler(byte[] bytes);
+  private MessageHandler handler;
+
+  public TCPClient(string host, int port, MessageHandler handler)
   {
     this.host = host;
     this.port = port;
+    this.handler = handler;
   }
 
   public void ConnectAndListen()
@@ -27,8 +31,6 @@ public class TCPClient
     listenThread = new Thread(new ThreadStart(ListenLoop));
     listenThread.IsBackground = true;
     listenThread.Start();
-
-    SendMessage("TCP client here!");
   }
 
   private void ListenLoop()
@@ -52,14 +54,15 @@ public class TCPClient
           msgLength = BitConverter.ToInt32(prefixBytes, 0);
 
           // Now read the message
-          // TODO: Optimize this to not allocate for each message received
-          Byte[] bytes = new Byte[msgLength];
+          // TODO: Optimize this to not allocate for each message received, and instead only expand the buffer and store
+          //  the number of bytes written, resetting this effective "buffer tail" after each message is complete.
+          byte[] bytes = new byte[msgLength];
           bytesRead = 0;
           while (bytesRead < msgLength)
           {
             bytesRead += stream.Read(bytes, bytesRead, msgLength - bytesRead);
           }
-          Debug.Log("Received: " + Encoding.UTF8.GetString(bytes));
+          handler(bytes);
         }
       }
     }
@@ -69,27 +72,25 @@ public class TCPClient
     }
   }
 
-  public void SendMessage(string msg)
+  // Send assumes that the rawMsg passed is already length-prefixed. eg, using FlatBuffers's `FinishSizePrefixed...` functions.
+  public void Send(byte[] rawMsg)
   {
-    if (tcpClient == null)
-    {
-      return;
-    }
-
     NetworkStream stream = tcpClient.GetStream();
     if (stream.CanWrite)
     {
-      byte[] msgBytes = Encoding.UTF8.GetBytes(msg);
-      byte[] prefix = BitConverter.GetBytes(msgBytes.Length);
-
-      stream.Write(prefix, 0, prefix.Length);
-      stream.Write(msgBytes, 0, msgBytes.Length);
+      stream.Write(rawMsg, 0, rawMsg.Length);
     }
   }
 
   public void Close()
   {
-    listenThread.Interrupt();
-    tcpClient.Close();
+    if (listenThread != null)
+    {
+      listenThread.Abort();
+    }
+    if (tcpClient != null)
+    {
+      tcpClient.Close();
+    }
   }
 }
